@@ -55,7 +55,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : (isset($_POST['action']) ? 
 
 // Action: Send Request
 if ($action === 'send_request') {
-    $targetUser = isset($_POST['target']) ? trim($_POST['target']) : '';
+    $targetUser = isset($_POST['target']) ? strtolower(trim($_POST['target'])) : '';
     if (empty($targetUser) || $targetUser === $currentUser) {
         echo json_encode(['status' => 'error', 'message' => 'Invalid target user.']);
         exit;
@@ -182,40 +182,38 @@ if ($action === 'upload_image') {
 
 // Action: Get Messages
 if ($action === 'get_messages') {
-    $targetUser = isset($_GET['target']) ? trim($_GET['target']) : '';
+    $targetUser = isset($_GET['target']) ? strtolower(trim($_GET['target'])) : '';
     if (empty($targetUser)) {
-        echo json_encode(['messages' => []]);
+        echo json_encode(['messages' => [], 'has_more' => false]);
         exit;
     }
     
+    $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
+    $limit = 20;
+
     $chatFile = getChatFile($currentUser, $targetUser, $chatsDir);
     $messages = file_exists($chatFile) ? readJson($chatFile) : [];
     
-    // Only return last 100 messages for performance
-    $messages = array_slice($messages, -100);
-    echo json_encode(['messages' => $messages]);
+    $total = count($messages);
+    $start = max(0, $total - $offset - $limit);
+    $length = min($limit, $total - $offset);
+    
+    $pageMessages = $length > 0 ? array_slice($messages, $start, $length) : [];
+
+    echo json_encode(['messages' => $pageMessages, 'has_more' => $start > 0]);
     exit;
 }
 
 // Action: Delete Chat
 if ($action === 'delete_chat') {
-    $targetUser = isset($_POST['target']) ? trim($_POST['target']) : '';
+    $targetUser = isset($_POST['target']) ? strtolower(trim($_POST['target'])) : '';
     if (empty($targetUser)) {
         echo json_encode(['status' => 'error']);
         exit;
     }
     
-    // Remove request
-    $requests = readJson($requestsFile);
-    $requests = array_filter($requests, function($req) use ($currentUser, $targetUser) {
-        if (($req['from'] === $currentUser && $req['to'] === $targetUser) || 
-            ($req['from'] === $targetUser && $req['to'] === $currentUser)) {
-            return false;
-        }
-        return true;
-    });
-    writeJson($requestsFile, array_values($requests));
-    
+    // Do not remove the connection request, only delete the chat file and associated media
+
     // Delete chat file and associated media
     $chatFile = getChatFile($currentUser, $targetUser, $chatsDir);
     if (file_exists($chatFile)) {
@@ -232,6 +230,79 @@ if ($action === 'delete_chat') {
     }
     
     echo json_encode(['status' => 'ok']);
+    exit;
+}
+
+// Action: Delete Connection
+if ($action === 'delete_connection') {
+    $targetUser = isset($_POST['target']) ? strtolower(trim($_POST['target'])) : '';
+    if (empty($targetUser)) {
+        echo json_encode(['status' => 'error']);
+        exit;
+    }
+    
+    // Remove request
+    $requests = readJson($requestsFile);
+    $requests = array_filter($requests, function($req) use ($currentUser, $targetUser) {
+        if (($req['from'] === $currentUser && $req['to'] === $targetUser) || 
+            ($req['from'] === $targetUser && $req['to'] === $currentUser)) {
+            return false;
+        }
+        return true;
+    });
+    writeJson($requestsFile, array_values($requests));
+    
+    echo json_encode(['status' => 'ok']);
+    exit;
+}
+
+// Action: Delete Account
+if ($action === 'delete_account') {
+    $requests = readJson($requestsFile);
+    $affectedUsers = [];
+    $filteredRequests = [];
+    
+    foreach ($requests as $req) {
+        if ($req['from'] === $currentUser) {
+            $affectedUsers[] = $req['to'];
+        } elseif ($req['to'] === $currentUser) {
+            $affectedUsers[] = $req['from'];
+        } else {
+            $filteredRequests[] = $req;
+        }
+    }
+    writeJson($requestsFile, $filteredRequests);
+    
+    $affectedUsers = array_values(array_unique($affectedUsers));
+    
+    // Delete chat files with affected users
+    foreach ($affectedUsers as $targetUser) {
+        $chatFile = getChatFile($currentUser, $targetUser, $chatsDir);
+        if (file_exists($chatFile)) {
+            $messages = readJson($chatFile);
+            foreach ($messages as $msg) {
+                if (!empty($msg['image'])) {
+                    $imgPath = __DIR__ . '/' . $msg['image'];
+                    if (file_exists($imgPath)) {
+                        unlink($imgPath);
+                    }
+                }
+            }
+            unlink($chatFile);
+        }
+    }
+    
+    // Remove user from users.json
+    $users = readJson($usersFile);
+    if (isset($users[$currentUser])) {
+        unset($users[$currentUser]);
+        writeJson($usersFile, $users);
+    }
+    
+    // Destroy session
+    session_destroy();
+    
+    echo json_encode(['status' => 'ok', 'affected' => $affectedUsers]);
     exit;
 }
 

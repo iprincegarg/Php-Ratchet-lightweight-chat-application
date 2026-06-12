@@ -31,6 +31,22 @@ class Chat implements MessageComponentInterface {
             $from->username = $user;
             $this->userConnections[$user] = $from;
             echo "User authenticated: {$user} ({$from->resourceId})\n";
+            
+            $from->send(json_encode([
+                'type' => 'online_list',
+                'users' => array_keys($this->userConnections)
+            ]));
+            
+            $statusPayload = json_encode([
+                'type' => 'user_status',
+                'user' => $user,
+                'status' => 'online'
+            ]);
+            foreach ($this->clients as $client) {
+                if ($client !== $from) {
+                    $client->send($statusPayload);
+                }
+            }
             return;
         }
 
@@ -71,7 +87,8 @@ class Chat implements MessageComponentInterface {
             $messageData = [
                 'user' => $currentUser,
                 'text' => $text,
-                'time' => time()
+                'time' => time(),
+                'status' => 'sent'
             ];
             if ($imagePath) {
                 $messageData['image'] = $imagePath;
@@ -92,6 +109,16 @@ class Chat implements MessageComponentInterface {
                 $this->userConnections[$targetUser]->send($payload);
             }
         }
+        else if ($action === 'typing' || $action === 'stop_typing') {
+            $targetUser = $data['target'] ?? '';
+            echo "User {$currentUser} is sending {$action} to {$targetUser}\n";
+            if ($targetUser && isset($this->userConnections[$targetUser])) {
+                $this->userConnections[$targetUser]->send(json_encode([
+                    'type' => $action,
+                    'from' => $currentUser
+                ]));
+            }
+        }
         else if ($action === 'reload_requests') {
             $targetUser = $data['target'] ?? '';
             if ($targetUser && isset($this->userConnections[$targetUser])) {
@@ -99,13 +126,55 @@ class Chat implements MessageComponentInterface {
             }
             $from->send(json_encode(['type' => 'reload_requests']));
         }
+        else if ($action === 'mark_read') {
+            $targetUser = $data['target'] ?? '';
+            if (empty($targetUser)) return;
+
+            $chatsDir = $this->dataDir . '/chats';
+            $users = [$currentUser, $targetUser];
+            sort($users);
+            $chatFile = $chatsDir . '/' . md5($users[0] . '_' . $users[1]) . '.json';
+            
+            if (file_exists($chatFile)) {
+                $messages = json_decode(file_get_contents($chatFile), true) ?: [];
+                $changed = false;
+                
+                foreach ($messages as &$msg) {
+                    if ($msg['user'] === $targetUser && (!isset($msg['status']) || $msg['status'] !== 'read')) {
+                        $msg['status'] = 'read';
+                        $changed = true;
+                    }
+                }
+                
+                if ($changed) {
+                    file_put_contents($chatFile, json_encode($messages, JSON_PRETTY_PRINT));
+                    
+                    if (isset($this->userConnections[$targetUser])) {
+                        $this->userConnections[$targetUser]->send(json_encode([
+                            'type' => 'read_receipt',
+                            'from' => $currentUser
+                        ]));
+                    }
+                }
+            }
+        }
     }
 
     public function onClose(ConnectionInterface $conn) {
         $this->clients->detach($conn);
         if (isset($conn->username)) {
-            unset($this->userConnections[$conn->username]);
-            echo "User disconnected: {$conn->username}\n";
+            $user = $conn->username;
+            unset($this->userConnections[$user]);
+            echo "User disconnected: {$user}\n";
+            
+            $statusPayload = json_encode([
+                'type' => 'user_status',
+                'user' => $user,
+                'status' => 'offline'
+            ]);
+            foreach ($this->clients as $client) {
+                $client->send($statusPayload);
+            }
         } else {
             echo "Connection {$conn->resourceId} has disconnected\n";
         }

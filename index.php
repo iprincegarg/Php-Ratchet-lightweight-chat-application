@@ -2,7 +2,24 @@
 session_start();
 
 if (isset($_POST['username'])) {
-    $_SESSION['username'] = htmlspecialchars($_POST['username']);
+    $uname = strtolower(htmlspecialchars($_POST['username']));
+    $uname = substr($uname, 0, 8);
+    $_SESSION['username'] = $uname;
+    
+    $dataDir = __DIR__ . '/data';
+    if (!file_exists($dataDir)) {
+        mkdir($dataDir, 0777, true);
+    }
+    $usersFile = $dataDir . '/users.json';
+    $users = [];
+    if (file_exists($usersFile)) {
+        $users = json_decode(file_get_contents($usersFile), true) ?: [];
+    }
+    if (!isset($users[$uname])) {
+        $users[$uname] = ['joined' => time()];
+        file_put_contents($usersFile, json_encode($users, JSON_PRETTY_PRINT), LOCK_EX);
+    }
+
     header("Location: index.php");
     exit;
 }
@@ -30,14 +47,14 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            height: 100dvh;
             margin: 0;
         }
 
         .app-container {
             display: flex;
             width: 100%;
-            height: 100vh;
+            height: 100dvh;
             background: #fff;
             overflow: hidden;
         }
@@ -174,7 +191,7 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
             position: absolute;
             top: 15px;
             left: 15px;
-            z-index: 10;
+            z-index: 999;
             background: #fff;
             color: #2c3e50;
             border: 1px solid #ddd;
@@ -192,6 +209,12 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
         .toggle-sidebar-btn:hover {
             background: #f8f9fa;
             border-color: #ccc;
+        }
+        .toggle-sidebar-btn svg {
+            transition: transform 0.3s ease;
+        }
+        .sidebar:not(.collapsed) + .chat-area .toggle-sidebar-btn svg {
+            transform: scaleX(-1);
         }
 
         .chat-header {
@@ -242,6 +265,13 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
             font-size: 0.8em;
             margin-bottom: 4px;
             opacity: 0.8;
+        }
+
+        .message .time {
+            font-size: 0.7em;
+            opacity: 0.7;
+            text-align: right;
+            margin-top: 4px;
         }
 
         .message.self {
@@ -411,7 +441,44 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
         .login-container button:hover {
             background: #2980b9;
         }
+
+        /* Responsive Enterprise Design */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: absolute;
+                z-index: 100;
+                height: 100dvh;
+                box-shadow: 2px 0 15px rgba(0,0,0,0.2);
+            }
+            .sidebar.collapsed {
+                margin-left: -300px;
+                box-shadow: none;
+            }
+            .sidebar:not(.collapsed) + .chat-area .toggle-sidebar-btn {
+                display: none !important;
+            }
+            .mobile-close-btn {
+                display: flex !important;
+            }
+            .chat-header {
+                padding-left: 65px; /* Leave space for hamburger menu */
+            }
+            .input-area {
+                padding: 15px;
+            }
+            .input-area input {
+                padding: 10px 15px;
+            }
+            .input-area button {
+                padding: 8px 15px;
+            }
+            .message {
+                max-width: 85%;
+            }
+        }
+
     </style>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.21.3/index.js"></script>
 </head>
 
 <body>
@@ -420,9 +487,22 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
         <div class="login-container">
             <h2>Welcome to Chat</h2>
             <form method="POST" action="index.php">
-                <input type="text" name="username" placeholder="Choose a username" required autocomplete="off">
+                <input type="text" id="login-username" name="username" placeholder="Choose a username" maxlength="8" required autocomplete="off" style="margin-bottom: 5px;">
+                <div id="char-count" style="text-align: right; font-size: 12px; color: #95a5a6; margin-bottom: 15px;">0 / 8 chars</div>
                 <button type="submit">Start Chat</button>
             </form>
+            <script>
+                const loginInput = document.getElementById('login-username');
+                const charCount = document.getElementById('char-count');
+                loginInput.addEventListener('input', function() {
+                    charCount.textContent = this.value.length + ' / 8 chars';
+                    if (this.value.length === 8) {
+                        charCount.style.color = '#e74c3c'; // Turns red when limit is reached
+                    } else {
+                        charCount.style.color = '#95a5a6';
+                    }
+                });
+            </script>
         </div>
     <?php else: ?>
         <div class="app-container">
@@ -430,11 +510,21 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
             <div class="sidebar">
                 <div class="sidebar-header">
                     <span><?php echo htmlspecialchars($username); ?></span>
-                    <a href="?logout=1">Logout</a>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <a href="#" class="mobile-close-btn" onclick="toggleSidebar()" title="Close Menu" style="color: #ecf0f1; text-decoration: none; display: none;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
+                        </a>
+                        <a href="#" onclick="deleteAccount()" title="Delete Account" style="color: #e74c3c; text-decoration: none; display: flex;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </a>
+                        <a href="?logout=1" title="Logout" style="color: #ecf0f1; text-decoration: none; display: flex;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                        </a>
+                    </div>
                 </div>
 
                 <form class="add-connection" id="add-form">
-                    <input type="text" id="target-user" placeholder="Add user by name..." required autocomplete="off">
+                    <input type="text" id="target-user" placeholder="Add user by name..." maxlength="8" required autocomplete="off">
                     <button type="submit">+</button>
                 </form>
 
@@ -449,7 +539,9 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
 
             <!-- Chat Area -->
         <div class="chat-area">
-            <button class="toggle-sidebar-btn" onclick="toggleSidebar()" title="Toggle Sidebar">☰</button>
+            <button class="toggle-sidebar-btn" onclick="toggleSidebar()" title="Toggle Sidebar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m13 17 5-5-5-5"/><path d="M6 17l5-5-5-5"/></svg>
+            </button>
             <div class="chat-content" id="chat-area">
                 <div class="placeholder-message">Select a chat to start messaging</div>
             </div>
@@ -468,6 +560,10 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
             let isUserScrolling = false;
             let lastMessageCount = 0;
             let ws;
+            let messageOffset = 0;
+            let hasMoreMessages = false;
+            let isLoadingMessages = false;
+            let onlineUsers = [];
 
             function initWebSocket() {
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -491,8 +587,58 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                     if (data.type === 'new_message') {
                         if (activeChat === data.chat || activeChat === data.from) {
                             appendMessage(data.message);
+                            messageOffset++;
+                            if (activeChat === data.from) {
+                                if (document.hasFocus()) {
+                                    ws.send(JSON.stringify({ action: 'mark_read', target: activeChat }));
+                                }
+                            }
                         }
                         loadRequests(); // update ordering or anything else if needed
+                    } else if (data.type === 'online_list') {
+                        onlineUsers = data.users;
+                        loadRequests();
+                        if (activeChat) {
+                            const hdr = document.getElementById('chat-header-status');
+                            if (hdr) {
+                                hdr.textContent = onlineUsers.includes(activeChat) ? 'Online' : 'Offline';
+                                hdr.style.color = onlineUsers.includes(activeChat) ? '#2ecc71' : '#bdc3c7';
+                            }
+                        }
+                    } else if (data.type === 'user_status') {
+                        if (data.status === 'online') {
+                            if (!onlineUsers.includes(data.user)) onlineUsers.push(data.user);
+                        } else {
+                            onlineUsers = onlineUsers.filter(u => u !== data.user);
+                        }
+                        loadRequests();
+                        if (activeChat === data.user) {
+                            const hdr = document.getElementById('chat-header-status');
+                            if (hdr) {
+                                hdr.textContent = data.status === 'online' ? 'Online' : 'Offline';
+                                hdr.style.color = data.status === 'online' ? '#2ecc71' : '#bdc3c7';
+                            }
+                        }
+                    } else if (data.type === 'read_receipt') {
+                        if (activeChat === data.from) {
+                            const sentTicks = document.querySelectorAll('.message.self .status-tick.sent');
+                            sentTicks.forEach(tick => {
+                                tick.outerHTML = `<svg class="status-tick read" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 4 12 14.01 9 11.01"></polyline><polyline points="16 4 6 14.01 3 11.01"></polyline></svg>`;
+                            });
+                        }
+                    } else if (data.type === 'typing') {
+                        if (activeChat === data.from) {
+                            const ti = document.getElementById('typing-indicator');
+                            if (ti) {
+                                ti.textContent = data.from + ' is typing...';
+                                ti.style.display = 'block';
+                            }
+                        }
+                    } else if (data.type === 'stop_typing') {
+                        if (activeChat === data.from) {
+                            const ti = document.getElementById('typing-indicator');
+                            if (ti) ti.style.display = 'none';
+                        }
                     } else if (data.type === 'reload_requests') {
                         loadRequests();
                         if (activeChat) loadMessages();
@@ -504,23 +650,63 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                 };
             }
 
-            function appendMessage(msg) {
-                const chatBox = document.getElementById('chat-box');
-                if (!chatBox) return;
+            function createMessageElement(msg) {
                 const div = document.createElement('div');
                 const isSelf = msg.user === currentUser;
                 div.className = 'message ' + (isSelf ? 'self' : 'other');
 
                 let contentHtml = `<div class="user">${msg.user}</div>`;
-                if (msg.text) contentHtml += `<div class="text">${msg.text}</div>`;
+                if (msg.text) {
+                    const isImgUrl = msg.text.match(/^https?:\/\/.+\.(gif|png|jpe?g|webp)(\?.*)?$/i) || msg.text.includes('tenor.com') || msg.text.includes('giphy.com');
+                    if (isImgUrl) {
+                        contentHtml += `<img src="${msg.text}" alt="GIF/Image" style="cursor: zoom-in; max-width: 250px; border-radius: 8px;" onclick="zoomImage(this.src)">`;
+                    } else {
+                        contentHtml += `<div class="text">${msg.text}</div>`;
+                    }
+                }
                 if (msg.image) contentHtml += `<img src="${msg.image}" alt="Attached Image" style="cursor: zoom-in;" onclick="zoomImage(this.src)">`;
 
+                if (msg.time) {
+                    const date = new Date(msg.time * 1000);
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    const month = months[date.getMonth()];
+                    const year = date.getFullYear();
+                    const hours = String(date.getHours()).padStart(2, '0');
+                    const minutes = String(date.getMinutes()).padStart(2, '0');
+                    let timeHtml = `<div class="time" style="display: flex; align-items: center; justify-content: flex-end; gap: 4px;">${day} ${month} ${year} ${hours}:${minutes}`;
+                    
+                    if (isSelf) {
+                        if (msg.status === 'read') {
+                            timeHtml += `<svg class="status-tick read" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 4 12 14.01 9 11.01"></polyline><polyline points="16 4 6 14.01 3 11.01"></polyline></svg>`;
+                        } else {
+                            timeHtml += `<svg class="status-tick sent" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+                        }
+                    }
+                    timeHtml += `</div>`;
+                    contentHtml += timeHtml;
+                }
+
                 div.innerHTML = contentHtml;
+                return div;
+            }
+
+            function appendMessage(msg) {
+                const chatBox = document.getElementById('chat-box');
+                if (!chatBox) return;
+                const div = createMessageElement(msg);
                 chatBox.appendChild(div);
 
                 if (!isUserScrolling) {
                     chatBox.scrollTop = chatBox.scrollHeight;
                 }
+            }
+
+            function prependMessage(msg) {
+                const chatBox = document.getElementById('chat-box');
+                if (!chatBox) return;
+                const div = createMessageElement(msg);
+                chatBox.insertBefore(div, chatBox.firstChild);
             }
 
             function apiCall(data) {
@@ -581,7 +767,15 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                                 if (activeChat === otherUser) activeChatStillExists = true;
                                 const div = document.createElement('div');
                                 div.className = 'list-item' + (activeChat === otherUser ? ' active' : '');
-                                div.textContent = otherUser;
+                                
+                                const dotColor = onlineUsers.includes(otherUser) ? '#2ecc71' : '#bdc3c7';
+                                div.innerHTML = `
+                                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                                        <span>${otherUser}</span>
+                                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${dotColor};"></span>
+                                    </div>
+                                `;
+                                
                                 div.onclick = () => openChat(otherUser);
                                 chatsList.appendChild(div);
                             }
@@ -612,15 +806,46 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
             };
 
             window.deleteChat = function (user) {
-                if (confirm(`Are you sure you want to permanently delete the chat with ${user} for both of you?`)) {
+                if (confirm(`Are you sure you want to permanently delete the chat history with ${user} for both of you?`)) {
                     apiCall({ action: 'delete_chat', target: user }).then(res => {
+                        if (res.status === 'ok') {
+                            ws.send(JSON.stringify({ action: 'reload_requests', target: user }));
+                            loadMessages();
+                        } else {
+                            alert("Error deleting chat history.");
+                        }
+                    });
+                }
+            };
+
+            window.deleteConnection = function (user) {
+                if (confirm(`Are you sure you want to permanently remove the connection with ${user}? You will no longer be able to message each other.`)) {
+                    apiCall({ action: 'delete_connection', target: user }).then(res => {
                         if (res.status === 'ok') {
                             activeChat = null;
                             document.getElementById('chat-area').innerHTML = '<div class="placeholder-message">Select a chat to start messaging</div>';
                             ws.send(JSON.stringify({ action: 'reload_requests', target: user }));
                             loadRequests();
                         } else {
-                            alert("Error deleting chat.");
+                            alert("Error removing connection.");
+                        }
+                    });
+                }
+            };
+
+            window.deleteAccount = function () {
+                if (confirm("Are you sure you want to permanently delete your account and all associated data? This action cannot be undone.")) {
+                    apiCall({ action: 'delete_account' }).then(res => {
+                        if (res.status === 'ok') {
+                            if (res.affected && res.affected.length > 0) {
+                                res.affected.forEach(user => {
+                                    ws.send(JSON.stringify({ action: 'reload_requests', target: user }));
+                                });
+                            }
+                            // Redirect to logout to clear session
+                            window.location.href = 'index.php?logout=1';
+                        } else {
+                            alert("Error deleting account.");
                         }
                     });
                 }
@@ -631,25 +856,160 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                 loadRequests(); // Update active class
 
                 const chatArea = document.getElementById('chat-area');
+                const statusStr = onlineUsers.includes(user) ? 'Online' : 'Offline';
+                const statusColor = onlineUsers.includes(user) ? '#2ecc71' : '#bdc3c7';
+                
                 chatArea.innerHTML = `
                 <div class="chat-header">
-                    <span>Chat with ${user}</span>
-                    <button class="delete-btn" onclick="deleteChat('${user}')" title="Delete Chat">🗑️</button>
+                    <div style="display: flex; flex-direction: column;">
+                        <span style="font-weight: bold;">Chat with ${user}</span>
+                        <span id="chat-header-status" style="font-size: 12px; color: ${statusColor}; margin-top: 2px;">${statusStr}</span>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button class="delete-btn" onclick="deleteChat('${user}')" title="Delete Chat History" style="display: flex; margin: 0;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                        <button class="delete-btn" onclick="deleteConnection('${user}')" title="Remove Connection" style="display: flex; margin: 0;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                        </button>
+                    </div>
                 </div>
                 <div class="messages" id="chat-box"></div>
+                <div id="typing-indicator" style="display: none; padding: 0 20px 10px 20px; font-size: 13px; color: #95a5a6; font-style: italic;"></div>
                 <form class="input-area" id="chat-form">
                     <input type="file" id="image-input" accept="image/*" style="display:none">
                     <button type="button" class="attach-btn" onclick="document.getElementById('image-input').click()" title="Attach Image">📎</button>
+                    <button type="button" class="attach-btn" id="gif-btn" title="Add GIF" style="font-weight: bold; font-size: 14px;">GIF</button>
+                    <button type="button" class="attach-btn" id="emoji-btn" title="Add Emoji">😀</button>
+                    
+                    <div id="emoji-picker-container" style="display: none; position: absolute; bottom: 80px; left: 20px; z-index: 1000; box-shadow: 0 4px 15px rgba(0,0,0,0.2); border-radius: 8px; overflow: hidden; background: white;">
+                        <emoji-picker></emoji-picker>
+                    </div>
+
+                    <div id="gif-picker-container" style="display: none; position: absolute; bottom: 80px; left: 60px; z-index: 1000; background: white; width: 300px; height: 350px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); border-radius: 8px; flex-direction: column;">
+                        <div style="display: flex; border-bottom: 1px solid #ddd;">
+                            <select id="gif-provider" style="border: none; outline: none; background: #f8f9fa; padding: 10px; border-radius: 8px 0 0 0; cursor: pointer; border-right: 1px solid #ddd;">
+                                <option value="tenor">Tenor</option>
+                                <option value="giphy">Giphy</option>
+                            </select>
+                            <input type="text" id="gif-search" placeholder="Search GIFs..." style="flex: 1; box-sizing: border-box; padding: 10px; border: none; outline: none; border-radius: 0 8px 0 0;">
+                        </div>
+                        <div id="gif-results" style="flex: 1; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 5px; padding: 5px;"></div>
+                    </div>
+
                     <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
                     <button type="submit">Send</button>
                 </form>
             `;
 
                 const chatBox = document.getElementById('chat-box');
-                const attachBtn = document.querySelector('.attach-btn');
-                const imageInput = document.getElementById('image-input');
-                const chatForm = document.getElementById('chat-form');
                 const messageInput = document.getElementById('message-input');
+                const chatForm = document.getElementById('chat-form');
+                const imageInput = document.getElementById('image-input');
+                
+                // Emoji & GIF logic
+                const emojiBtn = document.getElementById('emoji-btn');
+                const emojiContainer = document.getElementById('emoji-picker-container');
+                const picker = document.querySelector('emoji-picker');
+
+                const gifBtn = document.getElementById('gif-btn');
+                const gifContainer = document.getElementById('gif-picker-container');
+                const gifSearch = document.getElementById('gif-search');
+                const gifResults = document.getElementById('gif-results');
+
+                emojiBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    emojiContainer.style.display = emojiContainer.style.display === 'none' ? 'block' : 'none';
+                    gifContainer.style.display = 'none';
+                });
+
+                gifBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (gifContainer.style.display === 'none') {
+                        gifContainer.style.display = 'flex';
+                        emojiContainer.style.display = 'none';
+                        if (gifResults.innerHTML === '') searchGifs('trending');
+                    } else {
+                        gifContainer.style.display = 'none';
+                    }
+                });
+
+                let gifTimeout;
+                gifSearch.addEventListener('input', () => {
+                    clearTimeout(gifTimeout);
+                    gifTimeout = setTimeout(() => {
+                        const q = gifSearch.value.trim();
+                        searchGifs(q ? q : 'trending');
+                    }, 500);
+                });
+
+                const gifProvider = document.getElementById('gif-provider');
+
+                gifProvider.addEventListener('change', () => {
+                    const q = gifSearch.value.trim();
+                    searchGifs(q ? q : 'trending');
+                });
+
+                function searchGifs(query) {
+                    gifResults.innerHTML = '<div style="padding: 10px; color: #999;">Loading...</div>';
+                    const provider = gifProvider.value;
+                    let url = '';
+
+                    if (provider === 'tenor') {
+                        url = query === 'trending' 
+                            ? `https://g.tenor.com/v1/trending?key=LIVDSRZULELA&limit=20`
+                            : `https://g.tenor.com/v1/search?q=${encodeURIComponent(query)}&key=LIVDSRZULELA&limit=20`;
+                    } else {
+                        url = query === 'trending'
+                            ? `https://api.giphy.com/v1/gifs/trending?api_key=Gc7131jiJuvI7IdN0HZ1D7nh0ow5BU6g&limit=20`
+                            : `https://api.giphy.com/v1/gifs/search?api_key=Gc7131jiJuvI7IdN0HZ1D7nh0ow5BU6g&q=${encodeURIComponent(query)}&limit=20`;
+                    }
+                    
+                    fetch(url).then(r => r.json()).then(data => {
+                        gifResults.innerHTML = '';
+                        const items = provider === 'tenor' ? data.results : data.data;
+                        
+                        if (items && items.length > 0) {
+                            items.forEach(gif => {
+                                const img = document.createElement('img');
+                                img.src = provider === 'tenor' ? gif.media[0].tinygif.url : gif.images.fixed_height_small.url;
+                                img.style.height = '80px';
+                                img.style.cursor = 'pointer';
+                                img.style.borderRadius = '4px';
+                                img.onclick = () => {
+                                    const gifUrl = provider === 'tenor' ? gif.media[0].mediumgif.url : gif.images.original.url;
+                                    ws.send(JSON.stringify({
+                                        action: 'send_message',
+                                        target: activeChat,
+                                        text: gifUrl
+                                    }));
+                                    gifContainer.style.display = 'none';
+                                };
+                                gifResults.appendChild(img);
+                            });
+                        } else {
+                            gifResults.innerHTML = '<div style="padding: 10px; color: #999;">No GIFs found</div>';
+                        }
+                    }).catch(e => {
+                        gifResults.innerHTML = '<div style="padding: 10px; color: red;">Error loading GIFs</div>';
+                    });
+                }
+
+                picker.addEventListener('emoji-click', event => {
+                    messageInput.value += event.detail.unicode;
+                    messageInput.focus();
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (emojiBtn && e.target !== emojiBtn && !emojiContainer.contains(e.target)) {
+                        emojiContainer.style.display = 'none';
+                    }
+                    if (gifBtn && e.target !== gifBtn && !gifContainer.contains(e.target)) {
+                        gifContainer.style.display = 'none';
+                    }
+                });
+
+                const attachBtn = document.querySelector('.attach-btn');
 
                 imageInput.addEventListener('change', function () {
                     if (this.files && this.files.length > 0) {
@@ -683,8 +1043,26 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                 });
 
                 chatBox.addEventListener('scroll', () => {
+                    if (chatBox.scrollTop === 0 && hasMoreMessages && !isLoadingMessages) {
+                        loadMoreMessages();
+                    }
                     const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 10;
                     isUserScrolling = !isAtBottom;
+                });
+
+                let typingTimer;
+                let isTyping = false;
+                
+                messageInput.addEventListener('input', () => {
+                    if (!isTyping) {
+                        isTyping = true;
+                        ws.send(JSON.stringify({ action: 'typing', target: activeChat }));
+                    }
+                    clearTimeout(typingTimer);
+                    typingTimer = setTimeout(() => {
+                        isTyping = false;
+                        ws.send(JSON.stringify({ action: 'stop_typing', target: activeChat }));
+                    }, 1500);
                 });
 
                 document.getElementById('chat-form').addEventListener('submit', function (e) {
@@ -700,19 +1078,29 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                         text: text
                     }));
                     textInput.value = '';
+                    
+                    isTyping = false;
+                    clearTimeout(typingTimer);
+                    ws.send(JSON.stringify({ action: 'stop_typing', target: activeChat }));
                 });
 
                 isUserScrolling = false;
                 lastMessageCount = 0;
                 loadMessages();
+                if (document.hasFocus()) {
+                    ws.send(JSON.stringify({ action: 'mark_read', target: activeChat }));
+                }
             }
 
             function loadMessages() {
                 if (!activeChat) return;
-                fetch('api.php?action=get_messages&target=' + encodeURIComponent(activeChat))
+                messageOffset = 0;
+                isLoadingMessages = true;
+                fetch('api.php?action=get_messages&target=' + encodeURIComponent(activeChat) + '&offset=' + messageOffset)
                     .then(r => r.json())
                     .then(data => {
                         const messages = data.messages || [];
+                        hasMoreMessages = data.has_more || false;
                         const chatBox = document.getElementById('chat-box');
                         if (!chatBox) return;
 
@@ -721,11 +1109,49 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                             appendMessage(msg);
                         });
 
+                        messageOffset += messages.length;
+
                         if (!isUserScrolling) {
                             chatBox.scrollTop = chatBox.scrollHeight;
                             lastMessageCount = messages.length;
                         }
-                    });
+                        isLoadingMessages = false;
+                    })
+                    .catch(() => { isLoadingMessages = false; });
+            }
+
+            function loadMoreMessages() {
+                if (!activeChat || !hasMoreMessages || isLoadingMessages) return;
+                isLoadingMessages = true;
+                
+                // Keep the old scroll height to restore position after prepending
+                const chatBox = document.getElementById('chat-box');
+                const oldScrollHeight = chatBox ? chatBox.scrollHeight : 0;
+
+                fetch('api.php?action=get_messages&target=' + encodeURIComponent(activeChat) + '&offset=' + messageOffset)
+                    .then(r => r.json())
+                    .then(data => {
+                        const messages = data.messages || [];
+                        hasMoreMessages = data.has_more || false;
+                        if (!chatBox || messages.length === 0) {
+                            isLoadingMessages = false;
+                            return;
+                        }
+
+                        // Prepend messages in reverse order so they appear chronologically above
+                        messages.reverse().forEach(msg => {
+                            prependMessage(msg);
+                        });
+
+                        messageOffset += messages.length;
+
+                        // Maintain scroll position so it doesn't jump to top
+                        const newScrollHeight = chatBox.scrollHeight;
+                        chatBox.scrollTop = newScrollHeight - oldScrollHeight;
+
+                        isLoadingMessages = false;
+                    })
+                    .catch(() => { isLoadingMessages = false; });
             }
 
             function zoomImage(src) {
@@ -741,6 +1167,12 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
         }
 
         initWebSocket();
+        
+        window.addEventListener('focus', () => {
+            if (activeChat && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: 'mark_read', target: activeChat }));
+            }
+        });
         </script>
     <?php endif; ?>
 
