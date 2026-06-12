@@ -509,7 +509,12 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
             <!-- Sidebar -->
             <div class="sidebar">
                 <div class="sidebar-header">
-                    <span><?php echo htmlspecialchars($username); ?></span>
+                    <span style="display: flex; align-items: center; gap: 8px;">
+                        <?php echo htmlspecialchars($username); ?>
+                        <a href="#" onclick="renameUser()" title="Edit Username" style="color: #bdc3c7; text-decoration: none;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                        </a>
+                    </span>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <a href="#" class="mobile-close-btn" onclick="toggleSidebar()" title="Close Menu" style="color: #ecf0f1; text-decoration: none; display: none;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
@@ -595,6 +600,8 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                             }
                         }
                         loadRequests(); // update ordering or anything else if needed
+                    } else if (data.type === 'reload_all') {
+                        window.location.reload();
                     } else if (data.type === 'online_list') {
                         onlineUsers = data.users;
                         loadRequests();
@@ -849,6 +856,31 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                         }
                     });
                 }
+            };
+
+            window.renameUser = function() {
+                const newName = prompt("Enter a new username (max 8 characters, alphanumeric and underscores only):");
+                if (!newName) return;
+                
+                const formData = new FormData();
+                formData.append('action', 'rename_user');
+                formData.append('new_username', newName);
+                
+                fetch('api.php', { method: 'POST', body: formData })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.status === 'ok') {
+                            if (ws && ws.readyState === WebSocket.OPEN) {
+                                ws.send(JSON.stringify({ action: 'force_reload_all' }));
+                            }
+                            window.location.reload();
+                        } else {
+                            alert(res.message);
+                        }
+                    })
+                    .catch(err => {
+                        alert("An error occurred during renaming.");
+                    });
             };
 
             function openChat(user) {

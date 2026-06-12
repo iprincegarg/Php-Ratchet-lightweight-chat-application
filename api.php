@@ -244,8 +244,8 @@ if ($action === 'delete_connection') {
     // Remove request
     $requests = readJson($requestsFile);
     $requests = array_filter($requests, function($req) use ($currentUser, $targetUser) {
-        if (($req['from'] === $currentUser && $req['to'] === $targetUser) || 
-            ($req['from'] === $targetUser && $req['to'] === $currentUser)) {
+        if ((strcasecmp($req['from'], $currentUser) === 0 && strcasecmp($req['to'], $targetUser) === 0) || 
+            (strcasecmp($req['from'], $targetUser) === 0 && strcasecmp($req['to'], $currentUser) === 0)) {
             return false;
         }
         return true;
@@ -263,9 +263,9 @@ if ($action === 'delete_account') {
     $filteredRequests = [];
     
     foreach ($requests as $req) {
-        if ($req['from'] === $currentUser) {
+        if (strcasecmp($req['from'], $currentUser) === 0) {
             $affectedUsers[] = $req['to'];
-        } elseif ($req['to'] === $currentUser) {
+        } elseif (strcasecmp($req['to'], $currentUser) === 0) {
             $affectedUsers[] = $req['from'];
         } else {
             $filteredRequests[] = $req;
@@ -303,6 +303,75 @@ if ($action === 'delete_account') {
     session_destroy();
     
     echo json_encode(['status' => 'ok', 'affected' => $affectedUsers]);
+    exit;
+}
+
+// Action: Rename User
+if ($action === 'rename_user') {
+    $newUsername = isset($_POST['new_username']) ? strtolower(trim($_POST['new_username'])) : '';
+    
+    if (empty($newUsername) || strlen($newUsername) > 8 || !preg_match('/^[a-z0-9_]+$/', $newUsername)) {
+        echo json_encode(['status' => 'error', 'message' => 'Username must be 1-8 chars (lowercase alphanumeric and underscores).']);
+        exit;
+    }
+    
+    if ($newUsername === $currentUser) {
+        echo json_encode(['status' => 'error', 'message' => 'That is already your username.']);
+        exit;
+    }
+
+    $users = readJson($usersFile);
+    if (isset($users[$newUsername])) {
+        echo json_encode(['status' => 'error', 'message' => 'Username is already taken.']);
+        exit;
+    }
+
+    // 1. Migrate users.json
+    $users[$newUsername] = $users[$currentUser];
+    unset($users[$currentUser]);
+    writeJson($usersFile, $users);
+
+    // 2. Migrate requests.json
+    $requests = readJson($requestsFile);
+    $requestsChanged = false;
+    foreach ($requests as &$req) {
+        if (strcasecmp($req['from'], $currentUser) === 0) {
+            $req['from'] = $newUsername;
+            $requestsChanged = true;
+        }
+        if (strcasecmp($req['to'], $currentUser) === 0) {
+            $req['to'] = $newUsername;
+            $requestsChanged = true;
+        }
+    }
+    if ($requestsChanged) {
+        writeJson($requestsFile, $requests);
+    }
+
+    // 3. Migrate chat files
+    foreach ($users as $otherUser => $data) {
+        if ($otherUser === $newUsername) continue;
+        
+        $oldChatFile = getChatFile($currentUser, $otherUser, $chatsDir);
+        if (file_exists($oldChatFile)) {
+            $messages = readJson($oldChatFile);
+            foreach ($messages as &$msg) {
+                if (strcasecmp($msg['user'], $currentUser) === 0) {
+                    $msg['user'] = $newUsername;
+                }
+            }
+            $newChatFile = getChatFile($newUsername, $otherUser, $chatsDir);
+            // Save to new file
+            writeJson($newChatFile, $messages);
+            // Delete old file
+            unlink($oldChatFile);
+        }
+    }
+
+    // Update Session
+    $_SESSION['username'] = $newUsername;
+
+    echo json_encode(['status' => 'ok']);
     exit;
 }
 

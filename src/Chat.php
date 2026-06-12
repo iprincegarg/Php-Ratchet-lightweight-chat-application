@@ -158,6 +158,12 @@ class Chat implements MessageComponentInterface {
                 }
             }
         }
+        else if ($action === 'force_reload_all') {
+            $payload = json_encode(['type' => 'reload_all']);
+            foreach ($this->clients as $client) {
+                $client->send($payload);
+            }
+        }
     }
 
     public function onClose(ConnectionInterface $conn) {
