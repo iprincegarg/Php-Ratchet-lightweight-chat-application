@@ -1,0 +1,4 @@
+/vendor/
+/data/
+composer.phar
+.DS_Store
