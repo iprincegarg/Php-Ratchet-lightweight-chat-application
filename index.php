@@ -5,7 +5,7 @@ if (isset($_POST['username'])) {
     $uname = strtolower(htmlspecialchars($_POST['username']));
     $uname = substr($uname, 0, 8);
     $_SESSION['username'] = $uname;
-    
+
     $dataDir = __DIR__ . '/data';
     if (!file_exists($dataDir)) {
         mkdir($dataDir, 0777, true);
@@ -38,9 +38,13 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Secret & Secure Chat</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #e9ecef;
@@ -70,6 +74,7 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
             border-right: 1px solid #1a252f;
             transition: margin-left 0.3s ease;
         }
+
         .sidebar.collapsed {
             margin-left: -300px;
         }
@@ -180,6 +185,7 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
             background: #f8f9fa;
             position: relative;
         }
+
         .chat-content {
             flex: 1;
             display: flex;
@@ -187,6 +193,7 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
             overflow: hidden;
             height: 100%;
         }
+
         .toggle-sidebar-btn {
             position: absolute;
             top: 15px;
@@ -203,17 +210,20 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
             display: flex;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
             transition: all 0.2s;
         }
+
         .toggle-sidebar-btn:hover {
             background: #f8f9fa;
             border-color: #ccc;
         }
+
         .toggle-sidebar-btn svg {
             transition: transform 0.3s ease;
         }
-        .sidebar:not(.collapsed) + .chat-area .toggle-sidebar-btn svg {
+
+        .sidebar:not(.collapsed)+.chat-area .toggle-sidebar-btn svg {
             transform: scaleX(-1);
         }
 
@@ -308,6 +318,7 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
 
         .input-area input {
             flex: 1;
+            min-width: 0;
             padding: 12px 15px;
             border: 1px solid #ddd;
             border-radius: 24px;
@@ -327,6 +338,7 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
             border-radius: 24px;
             cursor: pointer;
             font-weight: bold;
+            flex-shrink: 0;
         }
 
         .input-area button:hover {
@@ -337,9 +349,49 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
             background: none !important;
             color: #95a5a6 !important;
             padding: 10px !important;
+            margin: 0 !important;
             font-size: 20px !important;
             border-radius: 50% !important;
             transition: color 0.2s;
+            flex-shrink: 0;
+        }
+
+        .dropup-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .dropup-menu {
+            display: none;
+            position: absolute;
+            bottom: 50px;
+            left: 0;
+            background: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            flex-direction: column;
+            padding: 5px;
+            gap: 5px;
+            z-index: 1000;
+            min-width: 120px;
+        }
+
+        .dropup-item {
+            background: none;
+            border: none;
+            padding: 10px 15px;
+            text-align: left;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .dropup-item:hover {
+            background: #f1f1f1;
         }
 
         .attach-btn:hover {
@@ -444,39 +496,52 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
 
         /* Responsive Enterprise Design */
         @media (max-width: 768px) {
+            body {
+                width: 100vw;
+                overflow-x: hidden;
+            }
+
             .sidebar {
                 position: absolute;
                 z-index: 100;
                 height: 100dvh;
-                box-shadow: 2px 0 15px rgba(0,0,0,0.2);
+                box-shadow: 2px 0 15px rgba(0, 0, 0, 0.2);
             }
+
             .sidebar.collapsed {
                 margin-left: -300px;
                 box-shadow: none;
             }
-            .sidebar:not(.collapsed) + .chat-area .toggle-sidebar-btn {
+
+            .sidebar:not(.collapsed)+.chat-area .toggle-sidebar-btn {
                 display: none !important;
             }
+
             .mobile-close-btn {
                 display: flex !important;
             }
+
             .chat-header {
-                padding-left: 65px; /* Leave space for hamburger menu */
+                padding-left: 65px;
+                /* Leave space for hamburger menu */
             }
+
             .input-area {
                 padding: 15px;
             }
+
             .input-area input {
                 padding: 10px 15px;
             }
+
             .input-area button {
                 padding: 8px 15px;
             }
+
             .message {
                 max-width: 85%;
             }
         }
-
     </style>
     <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.21.3/index.js"></script>
 </head>
@@ -487,14 +552,16 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
         <div class="login-container">
             <h2>Welcome to Chat</h2>
             <form method="POST" action="index.php">
-                <input type="text" id="login-username" name="username" placeholder="Choose a username" maxlength="8" required autocomplete="off" style="margin-bottom: 5px;">
-                <div id="char-count" style="text-align: right; font-size: 12px; color: #95a5a6; margin-bottom: 15px;">0 / 8 chars</div>
+                <input type="text" id="login-username" name="username" placeholder="Choose a username" maxlength="8"
+                    required autocomplete="off" style="margin-bottom: 5px;">
+                <div id="char-count" style="text-align: right; font-size: 12px; color: #95a5a6; margin-bottom: 15px;">0 / 8
+                    chars</div>
                 <button type="submit">Start Chat</button>
             </form>
             <script>
                 const loginInput = document.getElementById('login-username');
                 const charCount = document.getElementById('char-count');
-                loginInput.addEventListener('input', function() {
+                loginInput.addEventListener('input', function () {
                     charCount.textContent = this.value.length + ' / 8 chars';
                     if (this.value.length === 8) {
                         charCount.style.color = '#e74c3c'; // Turns red when limit is reached
@@ -511,25 +578,47 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                 <div class="sidebar-header">
                     <span style="display: flex; align-items: center; gap: 8px;">
                         <?php echo htmlspecialchars($username); ?>
-                        <a href="#" onclick="renameUser()" title="Edit Username" style="color: #bdc3c7; text-decoration: none;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                        <a href="#" onclick="renameUser()" title="Edit Username"
+                            style="color: #bdc3c7; text-decoration: none;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
                         </a>
                     </span>
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <a href="#" class="mobile-close-btn" onclick="toggleSidebar()" title="Close Menu" style="color: #ecf0f1; text-decoration: none; display: none;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
+                        <a href="#" class="mobile-close-btn" onclick="toggleSidebar()" title="Close Menu"
+                            style="color: #ecf0f1; text-decoration: none; display: none;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="m11 17-5-5 5-5" />
+                                <path d="m18 17-5-5 5-5" />
+                            </svg>
                         </a>
-                        <a href="#" onclick="deleteAccount()" title="Delete Account" style="color: #e74c3c; text-decoration: none; display: flex;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        <a href="#" onclick="deleteAccount()" title="Delete Account"
+                            style="color: #e74c3c; text-decoration: none; display: flex;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                                </path>
+                            </svg>
                         </a>
                         <a href="?logout=1" title="Logout" style="color: #ecf0f1; text-decoration: none; display: flex;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
                         </a>
                     </div>
                 </div>
 
                 <form class="add-connection" id="add-form">
-                    <input type="text" id="target-user" placeholder="Add user by name..." maxlength="8" required autocomplete="off">
+                    <input type="text" id="target-user" placeholder="Add user by name..." maxlength="8" required
+                        autocomplete="off">
                     <button type="submit">+</button>
                 </form>
 
@@ -543,14 +632,18 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
             </div>
 
             <!-- Chat Area -->
-        <div class="chat-area">
-            <button class="toggle-sidebar-btn" onclick="toggleSidebar()" title="Toggle Sidebar">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m13 17 5-5-5-5"/><path d="M6 17l5-5-5-5"/></svg>
-            </button>
-            <div class="chat-content" id="chat-area">
-                <div class="placeholder-message">Select a chat to start messaging</div>
+            <div class="chat-area">
+                <button class="toggle-sidebar-btn" onclick="toggleSidebar()" title="Toggle Sidebar">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m13 17 5-5-5-5" />
+                        <path d="M6 17l5-5-5-5" />
+                    </svg>
+                </button>
+                <div class="chat-content" id="chat-area">
+                    <div class="placeholder-message">Select a chat to start messaging</div>
+                </div>
             </div>
-        </div>
         </div>
 
         <!-- Image Modal -->
@@ -574,9 +667,9 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 let wsUrl;
 
-                // If running locally, connect directly to port 8080
-                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                    wsUrl = 'ws://localhost:8080';
+                // If running locally or on local network, connect directly to port 8080
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.match(/^(192\.168|10|172\.(1[6-9]|2[0-9]|3[0-1]))\./)) {
+                    wsUrl = 'ws://' + window.location.hostname + ':8080';
                 } else {
                     // If on production, use the reverse proxy endpoint
                     wsUrl = protocol + '//' + window.location.host + '/ws';
@@ -682,7 +775,7 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                     const hours = String(date.getHours()).padStart(2, '0');
                     const minutes = String(date.getMinutes()).padStart(2, '0');
                     let timeHtml = `<div class="time" style="display: flex; align-items: center; justify-content: flex-end; gap: 4px;">${day} ${month} ${year} ${hours}:${minutes}`;
-                    
+
                     if (isSelf) {
                         if (msg.status === 'read') {
                             timeHtml += `<svg class="status-tick read" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 4 12 14.01 9 11.01"></polyline><polyline points="16 4 6 14.01 3 11.01"></polyline></svg>`;
@@ -774,7 +867,7 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                                 if (activeChat === otherUser) activeChatStillExists = true;
                                 const div = document.createElement('div');
                                 div.className = 'list-item' + (activeChat === otherUser ? ' active' : '');
-                                
+
                                 const dotColor = onlineUsers.includes(otherUser) ? '#2ecc71' : '#bdc3c7';
                                 div.innerHTML = `
                                     <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
@@ -782,7 +875,7 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                                         <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${dotColor};"></span>
                                     </div>
                                 `;
-                                
+
                                 div.onclick = () => openChat(otherUser);
                                 chatsList.appendChild(div);
                             }
@@ -858,14 +951,14 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                 }
             };
 
-            window.renameUser = function() {
+            window.renameUser = function () {
                 const newName = prompt("Enter a new username (max 8 characters, alphanumeric and underscores only):");
                 if (!newName) return;
-                
+
                 const formData = new FormData();
                 formData.append('action', 'rename_user');
                 formData.append('new_username', newName);
-                
+
                 fetch('api.php', { method: 'POST', body: formData })
                     .then(r => r.json())
                     .then(res => {
@@ -890,7 +983,7 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                 const chatArea = document.getElementById('chat-area');
                 const statusStr = onlineUsers.includes(user) ? 'Online' : 'Offline';
                 const statusColor = onlineUsers.includes(user) ? '#2ecc71' : '#bdc3c7';
-                
+
                 chatArea.innerHTML = `
                 <div class="chat-header">
                     <div style="display: flex; flex-direction: column;">
@@ -910,9 +1003,14 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                 <div id="typing-indicator" style="display: none; padding: 0 20px 10px 20px; font-size: 13px; color: #95a5a6; font-style: italic;"></div>
                 <form class="input-area" id="chat-form">
                     <input type="file" id="image-input" accept="image/*" style="display:none">
-                    <button type="button" class="attach-btn" onclick="document.getElementById('image-input').click()" title="Attach Image">📎</button>
-                    <button type="button" class="attach-btn" id="gif-btn" title="Add GIF" style="font-weight: bold; font-size: 14px;">GIF</button>
-                    <button type="button" class="attach-btn" id="emoji-btn" title="Add Emoji">😀</button>
+                    <div class="dropup-container">
+                        <button type="button" class="attach-btn" id="main-attach-btn" title="Attachments">➕</button>
+                        <div class="dropup-menu" id="attach-dropup-menu">
+                            <button type="button" class="dropup-item" onclick="document.getElementById('image-input').click(); document.getElementById('attach-dropup-menu').style.display='none';" title="Attach Image">📎 Image</button>
+                            <button type="button" class="dropup-item" id="gif-btn" title="Add GIF">🖼️ GIF</button>
+                            <button type="button" class="dropup-item" id="emoji-btn" title="Add Emoji">😀 Emoji</button>
+                        </div>
+                    </div>
                     
                     <div id="emoji-picker-container" style="display: none; position: absolute; bottom: 80px; left: 20px; z-index: 1000; box-shadow: 0 4px 15px rgba(0,0,0,0.2); border-radius: 8px; overflow: hidden; background: white;">
                         <emoji-picker></emoji-picker>
@@ -938,7 +1036,7 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                 const messageInput = document.getElementById('message-input');
                 const chatForm = document.getElementById('chat-form');
                 const imageInput = document.getElementById('image-input');
-                
+
                 // Emoji & GIF logic
                 const emojiBtn = document.getElementById('emoji-btn');
                 const emojiContainer = document.getElementById('emoji-picker-container');
@@ -949,14 +1047,32 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                 const gifSearch = document.getElementById('gif-search');
                 const gifResults = document.getElementById('gif-results');
 
+                const mainAttachBtn = document.getElementById('main-attach-btn');
+                const attachDropupMenu = document.getElementById('attach-dropup-menu');
+
+                mainAttachBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    attachDropupMenu.style.display = attachDropupMenu.style.display === 'flex' ? 'none' : 'flex';
+                    emojiContainer.style.display = 'none';
+                    gifContainer.style.display = 'none';
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (attachDropupMenu && !attachDropupMenu.contains(e.target) && e.target !== mainAttachBtn) {
+                        attachDropupMenu.style.display = 'none';
+                    }
+                });
+
                 emojiBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
+                    attachDropupMenu.style.display = 'none';
                     emojiContainer.style.display = emojiContainer.style.display === 'none' ? 'block' : 'none';
                     gifContainer.style.display = 'none';
                 });
 
                 gifBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
+                    attachDropupMenu.style.display = 'none';
                     if (gifContainer.style.display === 'none') {
                         gifContainer.style.display = 'flex';
                         emojiContainer.style.display = 'none';
@@ -988,19 +1104,19 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                     let url = '';
 
                     if (provider === 'tenor') {
-                        url = query === 'trending' 
-                            ? `https://g.tenor.com/v1/trending?key=LIVDSRZULELA&limit=20`
-                            : `https://g.tenor.com/v1/search?q=${encodeURIComponent(query)}&key=LIVDSRZULELA&limit=20`;
+                        url = query === 'trending'
+                            ? `https://g.tenor.com/v1/trending?key=LIVDSRZULELA&limit=20&contentfilter=off`
+                            : `https://g.tenor.com/v1/search?q=${encodeURIComponent(query)}&key=LIVDSRZULELA&limit=20&contentfilter=off`;
                     } else {
                         url = query === 'trending'
-                            ? `https://api.giphy.com/v1/gifs/trending?api_key=Gc7131jiJuvI7IdN0HZ1D7nh0ow5BU6g&limit=20`
-                            : `https://api.giphy.com/v1/gifs/search?api_key=Gc7131jiJuvI7IdN0HZ1D7nh0ow5BU6g&q=${encodeURIComponent(query)}&limit=20`;
+                            ? `https://api.giphy.com/v1/gifs/trending?api_key=Gc7131jiJuvI7IdN0HZ1D7nh0ow5BU6g&limit=20&rating=r`
+                            : `https://api.giphy.com/v1/gifs/search?api_key=Gc7131jiJuvI7IdN0HZ1D7nh0ow5BU6g&q=${encodeURIComponent(query)}&limit=20&rating=r`;
                     }
-                    
+
                     fetch(url).then(r => r.json()).then(data => {
                         gifResults.innerHTML = '';
                         const items = provider === 'tenor' ? data.results : data.data;
-                        
+
                         if (items && items.length > 0) {
                             items.forEach(gif => {
                                 const img = document.createElement('img');
@@ -1084,7 +1200,7 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
 
                 let typingTimer;
                 let isTyping = false;
-                
+
                 messageInput.addEventListener('input', () => {
                     if (!isTyping) {
                         isTyping = true;
@@ -1110,7 +1226,7 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
                         text: text
                     }));
                     textInput.value = '';
-                    
+
                     isTyping = false;
                     clearTimeout(typingTimer);
                     ws.send(JSON.stringify({ action: 'stop_typing', target: activeChat }));
@@ -1155,7 +1271,7 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
             function loadMoreMessages() {
                 if (!activeChat || !hasMoreMessages || isLoadingMessages) return;
                 isLoadingMessages = true;
-                
+
                 // Keep the old scroll height to restore position after prepending
                 const chatBox = document.getElementById('chat-box');
                 const oldScrollHeight = chatBox ? chatBox.scrollHeight : 0;
@@ -1187,24 +1303,24 @@ $username = $isLoggedIn ? $_SESSION['username'] : '';
             }
 
             function zoomImage(src) {
-            const modal = document.getElementById('image-modal');
-            const modalImg = document.getElementById('modal-img');
-            modal.style.display = 'flex';
-            modalImg.src = src;
-        }
-
-        function toggleSidebar() {
-            const sidebar = document.querySelector('.sidebar');
-            sidebar.classList.toggle('collapsed');
-        }
-
-        initWebSocket();
-        
-        window.addEventListener('focus', () => {
-            if (activeChat && ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ action: 'mark_read', target: activeChat }));
+                const modal = document.getElementById('image-modal');
+                const modalImg = document.getElementById('modal-img');
+                modal.style.display = 'flex';
+                modalImg.src = src;
             }
-        });
+
+            function toggleSidebar() {
+                const sidebar = document.querySelector('.sidebar');
+                sidebar.classList.toggle('collapsed');
+            }
+
+            initWebSocket();
+
+            window.addEventListener('focus', () => {
+                if (activeChat && ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ action: 'mark_read', target: activeChat }));
+                }
+            });
         </script>
     <?php endif; ?>
 
